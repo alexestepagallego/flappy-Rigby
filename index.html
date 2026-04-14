@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Flappy Bird Personalizado</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #222; /* Color oscuro alrededor del juego */
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            background-color: #70c5ce; /* Color de cielo por defecto */
+            box-shadow: 0 0 15px rgba(0,0,0,0.8);
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="juego" width="320" height="480"></canvas>
+
+    <script>
+        const canvas = document.getElementById("juego");
+        const ctx = canvas.getContext("2d");
+
+        // =========================================================================
+        // 🛠️ SECCIÓN DE PERSONALIZACIÓN: CAMBIA LAS IMÁGENES AQUÍ
+        // Pon el nombre de tu imagen entre las comillas. 
+        // Ejemplo: const RUTA_PAJARO = "mipajaro.png";
+        // Si dejas las comillas vacías (""), el juego usará bloques de colores.
+        // =========================================================================
+        
+        const RUTA_PAJARO = "rigby.png"; 
+        const RUTA_FONDO = "white.png"; 
+        const RUTA_TUBERIA_ARRIBA = "perro.png"; 
+        const RUTA_TUBERIA_ABAJO = "perro.png"; 
+
+        // =========================================================================
+
+        // --- Carga de imágenes ---
+        const birdImg = new Image();
+        if(RUTA_PAJARO) birdImg.src = RUTA_PAJARO;
+
+        const bgImg = new Image();
+        if(RUTA_FONDO) bgImg.src = RUTA_FONDO;
+
+        const pipeTopImg = new Image();
+        if(RUTA_TUBERIA_ARRIBA) pipeTopImg.src = RUTA_TUBERIA_ARRIBA;
+
+        const pipeBottomImg = new Image();
+        if(RUTA_TUBERIA_ABAJO) pipeBottomImg.src = RUTA_TUBERIA_ABAJO;
+
+        // --- Variables globales ---
+        let frames = 0;
+        let score = 0;
+        let gameOver = false;
+
+        // --- Objeto Pájaro ---
+        const bird = {
+            x: 50,
+            y: 150,
+            width: 50,
+            height: 50,
+            gravity: 0.25,
+            jump: 4.6,
+            velocity: 0,
+            draw: function() {
+                if (RUTA_PAJARO && birdImg.complete) {
+                    ctx.drawImage(birdImg, this.x, this.y, this.width, this.height);
+                } else {
+                    // Pájaro por defecto (cuadrado amarillo) si no hay foto
+                    ctx.fillStyle = "#FFD700";
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            },
+            update: function() {
+                this.velocity += this.gravity;
+                this.y += this.velocity;
+
+                // Choca con el suelo
+                if (this.y + this.height >= canvas.height) {
+                    this.y = canvas.height - this.height;
+                    gameOver = true;
+                }
+                // Choca con el techo
+                if (this.y <= 0) {
+                    this.y = 0;
+                    this.velocity = 0;
+                }
+            },
+            flap: function() {
+                this.velocity = -this.jump;
+            }
+        };
+
+        // --- Objeto Tuberías ---
+        const pipes = {
+            items: [],
+            width: 50,
+            gap: 130, // Espacio entre la tubería de arriba y la de abajo
+            dx: 2,    // Velocidad a la que se mueven hacia la izquierda
+            
+            draw: function() {
+                for (let i = 0; i < this.items.length; i++) {
+                    let p = this.items[i];
+                    let topY = p.y;
+                    let bottomY = p.y + this.gap;
+
+                    // Dibujar tubería de arriba
+                    if (RUTA_TUBERIA_ARRIBA && pipeTopImg.complete) {
+                        ctx.drawImage(pipeTopImg, p.x, topY - 400, this.width, 400); 
+                    } else {
+                        ctx.fillStyle = "#2ECC71"; // Color verde por defecto
+                        ctx.fillRect(p.x, 0, this.width, topY);
+                    }
+
+                    // Dibujar tubería de abajo
+                    if (RUTA_TUBERIA_ABAJO && pipeBottomImg.complete) {
+                        ctx.drawImage(pipeBottomImg, p.x, bottomY, this.width, canvas.height - bottomY);
+                    } else {
+                        ctx.fillStyle = "#2ECC71";
+                        ctx.fillRect(p.x, bottomY, this.width, canvas.height - bottomY);
+                    }
+                }
+            },
+            update: function() {
+                // Generar nuevas tuberías cada 100 fotogramas
+                if (frames % 100 === 0) {
+                    this.items.push({
+                        x: canvas.width,
+                        y: Math.random() * (canvas.height - this.gap - 60) + 30 
+                    });
+                }
+
+                for (let i = 0; i < this.items.length; i++) {
+                    let p = this.items[i];
+                    p.x -= this.dx;
+
+                    let bottomY = p.y + this.gap;
+
+                    // Colisión con la tubería de arriba
+                    if (bird.x + bird.width > p.x && bird.x < p.x + this.width && bird.y < p.y) {
+                        gameOver = true;
+                    }
+                    // Colisión con la tubería de abajo
+                    if (bird.x + bird.width > p.x && bird.x < p.x + this.width && bird.y + bird.height > bottomY) {
+                        gameOver = true;
+                    }
+
+                    // Sumar puntos cuando el pájaro pasa la tubería
+                    if (p.x === bird.x) {
+                        score++;
+                    }
+
+                    // Eliminar tuberías que ya salieron de la pantalla por la izquierda
+                    if (p.x + this.width <= 0) {
+                        this.items.shift();
+                        i--; // Ajustar el índice tras eliminar
+                    }
+                }
+            },
+            reset: function() {
+                this.items = [];
+            }
+        };
+
+        // --- Controles (Teclado o Clic) ---
+        function accionarSalto() {
+            if (gameOver) {
+                resetGame();
+            } else {
+                bird.flap();
+            }
+        }
+
+        document.addEventListener("keydown", function(e) {
+            if (e.code === "Space" || e.code === "ArrowUp") {
+                accionarSalto();
+            }
+        });
+        canvas.addEventListener("mousedown", accionarSalto);
+        canvas.addEventListener("touchstart", accionarSalto); // Soporte para móviles
+
+        // --- Reiniciar Juego ---
+        function resetGame() {
+            bird.y = 150;
+            bird.velocity = 0;
+            pipes.reset();
+            score = 0;
+            frames = 0;
+            gameOver = false;
+            loop(); // Volver a arrancar el bucle
+        }
+
+        // --- Bucle Principal del Juego ---
+        function loop() {
+            // Dibujar Fondo
+            if (RUTA_FONDO && bgImg.complete) {
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = "#70c5ce"; // Limpiar la pantalla con azul cielo
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Actualizar lógicas si no hemos perdido
+            if (!gameOver) {
+                bird.update();
+                pipes.update();
+            }
+
+            // Dibujar elementos
+            pipes.draw();
+            bird.draw();
+
+            // Mostrar Puntuación
+            ctx.fillStyle = "white";
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.font = "bold 35px Arial";
+            ctx.fillText(score, canvas.width/2 - 10, 50);
+            ctx.strokeText(score, canvas.width/2 - 10, 50);
+
+            // Pantalla de Game Over
+            if (gameOver) {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = "white";
+                ctx.font = "bold 35px Arial";
+                ctx.fillText("GAME OVER", 50, canvas.height/2 - 20);
+                
+                ctx.font = "18px Arial";
+                ctx.fillText("Toca para reiniciar", 80, canvas.height/2 + 20);
+                return; // Cortar el bucle
+            }
+
+            frames++;
+            requestAnimationFrame(loop);
+        }
+
+        // --- Iniciar ---
+        loop();
+    </script>
+</body>
+</html>
